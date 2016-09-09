@@ -19,7 +19,7 @@ object flumeStreaming {
 
   def getFlumeMsg2SparkStream() = {
     val sprakMaster = "spark://uul-N501JW:7077"
-    val sc = new SparkConf().setAppName ("get flume msg ").setMaster (sprakMaster)
+    val sc = new SparkConf().setAppName("get flume msg ").setMaster(sprakMaster)
     val ssc = new StreamingContext(sc,Seconds(10))
     val flumeStream = FlumeUtils.createStream(ssc,"10.15.33.101",40333,StorageLevel.MEMORY_AND_DISK_SER)
     flumeStream.map( e => new String(e.event.getBody.array())).map(_.split("\n").map(x => x.split(" "))).
@@ -41,7 +41,6 @@ object flumeStreaming {
                 hTbale.put(put)
               }
           }
-          conn.close()
         }
     }
     ssc start()
