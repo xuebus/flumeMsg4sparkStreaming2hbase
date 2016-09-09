@@ -18,17 +18,19 @@ object flumeStreaming {
 
 
   def getFlumeMsg2SparkStream() = {
-    val sprakMaster = "spark://uul-N501JW:7077"
+    val sprakMaster = "spark://master:7077"
     val sc = new SparkConf().setAppName("get flume msg ").setMaster(sprakMaster)
+      .setJars(List("/home/uul/sparkstringing2hbase.jar"))
     val ssc = new StreamingContext(sc,Seconds(10))
-    val flumeStream = FlumeUtils.createStream(ssc,"10.15.33.101",40333,StorageLevel.MEMORY_AND_DISK_SER)
+    val flumeStream = FlumeUtils.createStream(ssc,"localhost",40333,StorageLevel.MEMORY_AND_DISK_SER)
     flumeStream.map( e => new String(e.event.getBody.array())).map(_.split("\n").map(x => x.split(" "))).
       map(_.map(x=>if (x.length == 3)(x(0)+","+x(1),x(2))else("",""))).map(_(0)).reduceByKey((x,y)=>y).foreachRDD{
         rdd=>rdd.foreachPartition{ partitionOfRecords =>
           var conf = HBaseConfiguration.create()
           conf.set("hbase.master", "master:60000")
           conf.set("hbase.zookeeper.property.clientPort", "2181")
-          conf.set("hbase.zookeeper.quorum", "master,datanode1,datanode2,datanode3,datanode4,datanode5,datanode6,datanode7")
+          conf.set("hbase.zookeeper.quorum",
+            "master,datanode1,datanode2,datanode3,datanode4,datanode5,datanode6,datanode7")
           conf.addResource("/home/uul/hbase-site.xml")
           var conn = HConnectionManager.createConnection(conf)
           var hTbale = conn.getTable("test")
