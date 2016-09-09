@@ -23,7 +23,7 @@ object flumeStreaming {
     val ssc = new StreamingContext(sc,Seconds(10))
     val flumeStream = FlumeUtils.createStream(ssc,"10.15.33.101",40333,StorageLevel.MEMORY_AND_DISK_SER)
     flumeStream.map( e => new String(e.event.getBody.array())).map(_.split("\n").map(x => x.split(" "))).
-      map (_.map(x=>if (x.length == 3)(x(0)+","+x(1),x(2))else("",""))).map(_(0)).reduceByKey((x,y)=>y).foreachRDD{
+      map(_.map(x=>if (x.length == 3)(x(0)+","+x(1),x(2))else("",""))).map(_(0)).reduceByKey((x,y)=>y).foreachRDD{
         rdd=>rdd.foreachPartition{ partitionOfRecords =>
           var conf = HBaseConfiguration.create()
           conf.set("hbase.master", "master:60000")
@@ -43,7 +43,7 @@ object flumeStreaming {
           }
         }
     }
-    ssc start()
-    ssc awaitTermination()
+    ssc.start
+    ssc.awaitTermination
   }
 }
