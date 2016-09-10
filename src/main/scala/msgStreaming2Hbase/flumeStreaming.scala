@@ -1,6 +1,5 @@
 package msgStreaming2Hbase
 
-
 import java.net.InetSocketAddress
 
 import org.apache.hadoop.hbase.HBaseConfiguration
@@ -24,14 +23,13 @@ object flumeStreaming {
     InetSocketAddress.createUnresolved("10.0.138.228",40333),
     InetSocketAddress.createUnresolved("10.0.138.229",40333)
   )
-  val sprakMaster = "spark://master:7077"
+  val sprakMaster = "spark://uul-N501JW:7077"
   val jars = List("/home/uul/flumemsg4sparkstreaming2hbase.jar")
-
   def main(args: Array[String]): Unit = {
-    val sc = new SparkConf().setAppName("msg2hbase").setMaster(sprakMaster)
-      .setJars(jars).set("spark.executor.memory","5g")
+    val sc = new SparkConf().setAppName("get flume msg ").setMaster(sprakMaster).setJars(jars)
+      .set("spark.executor.memory","5g")
     val ssc = new StreamingContext(sc,Seconds(10))
-    for(address <- nodes) getFlumeMsg2SparkStream(ssc,address)
+    for (address <- nodes) getFlumeMsg2SparkStream(ssc,address)
     ssc.start
     ssc.awaitTermination
   }
@@ -45,8 +43,7 @@ object flumeStreaming {
           var conf = HBaseConfiguration.create()
           conf.set("hbase.master", "master:60000")
           conf.set("hbase.zookeeper.property.clientPort", "2181")
-          conf.set("hbase.zookeeper.quorum",
-            "master,datanode1,datanode2,datanode3,datanode4,datanode5,datanode6,datanode7")
+          conf.set("hbase.zookeeper.quorum", "master,datanode1,datanode2,datanode3,datanode4,datanode5,datanode6,datanode7")
           conf.addResource("/home/uul/hbase-site.xml")
           var conn = HConnectionManager.createConnection(conf)
           var hTbale:HTableInterface = conn.getTable("test")
@@ -61,5 +58,6 @@ object flumeStreaming {
           }
         }
     }
+
   }
 }
