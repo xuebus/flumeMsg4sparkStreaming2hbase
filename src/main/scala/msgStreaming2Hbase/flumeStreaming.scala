@@ -24,7 +24,7 @@ object flumeStreaming {
     InetSocketAddress.createUnresolved("10.0.138.229",40333)
   )
   val sprakMaster = "spark://master:7077"
-  val jars = List("/home/uul/flumemsg4sparkstreaming2hbase.jar")
+  val jars = List("/home/uul/sparkstringing2hbase.jar")
   def main(args: Array[String]): Unit = {
     val sc = new SparkConf().setAppName("get flume msg ").setMaster(sprakMaster).setJars(jars)
       .set("spark.executor.memory","5g")
