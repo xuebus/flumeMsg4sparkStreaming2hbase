@@ -3,7 +3,8 @@ package msgStreaming2Hbase
 import java.net.InetSocketAddress
 
 import org.apache.hadoop.hbase.HBaseConfiguration
-import org.apache.hadoop.hbase.client.{HConnectionManager, HTableInterface, Put}
+import org.apache.hadoop.hbase.client._
+import org.apache.hadoop.hbase.filter.PageFilter
 import org.apache.spark.SparkConf
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.flume.FlumeUtils
@@ -37,27 +38,32 @@ object flumeStreaming {
 
   def getFlumeMsg2SparkStream(ssc:StreamingContext,address:InetSocketAddress) = {
     val flumeStream = FlumeUtils.createStream(ssc,address.getHostString,address.getPort,StorageLevel.MEMORY_AND_DISK_SER)
-    flumeStream.map( e => new String(e.event.getBody.array())).map(_.split("\n").map(x => x.split(" "))).
+    flumeStream.map( e => new String(e.event.getBody.array)).map(_.split("\n").map(x => x.split(" "))).
       map(_.map(x=>if (x.length == 3)(x(0)+","+x(1),x(2))else("",""))).map(_(0)).reduceByKey((x,y)=>y).foreachRDD{
         rdd=>rdd.foreachPartition{ partitionOfRecords =>
-          var conf = HBaseConfiguration.create()
+          val conf = HBaseConfiguration.create
           conf.set("hbase.master", "master:60000")
           conf.set("hbase.zookeeper.property.clientPort", "2181")
           conf.set("hbase.zookeeper.quorum", "master,datanode1,datanode2,datanode3,datanode4,datanode5,datanode6,datanode7")
           conf.addResource("/home/uul/hbase-site.xml")
-          var conn = HConnectionManager.createConnection(conf)
-          var hTbale:HTableInterface = conn.getTable("test")
+          val conn = HConnectionManager.createConnection(conf)
+          val hTbale:HTableInterface = conn.getTable("test")
           partitionOfRecords.foreach{
             kv=>
               if (kv._2.length!=0&&kv._1.length!=0) {
-                print(kv)
-                var put = new Put(kv._1.getBytes)
+                var numLong = 1L
+                val result = hTbale.getScanner(new Scan(kv._1.getBytes,new PageFilter(1)))
+                val rs = result.next
+                if (rs != null && rs.containsColumn("cf".getBytes,"num".getBytes))
+                  numLong = new String(rs.getValue("cf".getBytes,"num".getBytes)).toLong
+                result.close
+                val put = new Put(kv._1.getBytes)
+                put.add("cf".getBytes,"num".getBytes,numLong.toString.getBytes)
                 put.add("cf".getBytes,"helo".getBytes,kv._2.getBytes)
                 hTbale.put(put)
               }
           }
         }
     }
-
   }
 }
