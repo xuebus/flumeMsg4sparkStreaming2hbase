@@ -28,7 +28,7 @@ object flumeStreaming {
   val jars = List("/home/uul/sparkstringing2hbase.jar")
   def main(args: Array[String]): Unit = {
     val sc = new SparkConf().setAppName("get flume msg ").setMaster(sprakMaster).setJars(jars)
-      .set("spark.executor.memory","5g")
+      .set("spark.executor.memory","10g")
     val ssc = new StreamingContext(sc,Seconds(10))
     for (address <- nodes) getFlumeMsg2SparkStream(ssc,address)
     ssc.start
@@ -52,10 +52,10 @@ object flumeStreaming {
             kv=>
               if (kv._2.length!=0&&kv._1.length!=0) {
                 var numLong = 1L
-                val result = hTbale.getScanner(new Scan(kv._1.getBytes,new PageFilter(1)))
+                val result = hTbale.getScanner(new Scan(kv._1.substring(0,kv._1.length-1).getBytes,new PageFilter(1)))
                 val rs = result.next
                 if (rs != null && rs.containsColumn("cf".getBytes,"num".getBytes))
-                  numLong = new String(rs.getValue("cf".getBytes,"num".getBytes)).toLong
+                  numLong = new String(rs.getValue("cf".getBytes,"num".getBytes)).toLong + 1
                 result.close
                 val put = new Put(kv._1.getBytes)
                 put.add("cf".getBytes,"num".getBytes,numLong.toString.getBytes)
@@ -63,6 +63,8 @@ object flumeStreaming {
                 hTbale.put(put)
               }
           }
+          hTbale.close
+          conn.close
         }
     }
   }
