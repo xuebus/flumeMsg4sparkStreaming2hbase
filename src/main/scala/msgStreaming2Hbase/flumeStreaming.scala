@@ -14,8 +14,15 @@ import scala.util.Success
 
 /**
   * Created by uul on 16-9-7.
-  * 启动方式
-  * bin/spark-submit --class msgStreaming2Hbase.flumeStreaming /home/hadoop/sparkstringing2hbase.jar spark://master:7077  /home/hadoop/sparkstringing2hbase.jar  6  10.0.138.222,40333,10.0.138.223,40333,10.0.138.224,40333,10.0.138.225,40333,10.0.138.226,40333,10.0.138.227,40333,10.0.138.228,40333,10.0.138.229,40333
+  * 启动方式 :
+  * bin/spark-submit --class msgStreaming2Hbase.flumeStreaming /home/hadoop/sparkstringing2hbase.jar spark://master:7077  /home/hadoop/sparkstringing2hbase.jar  6 300000  10.0.138.222,40333,10.0.138.223,40333,10.0.138.224,40333,10.0.138.225,40333,10.0.138.226,40333,10.0.138.227,40333,10.0.138.228,40333,10.0.138.229,40333
+  * 大致格式  spark-submit --class msgStreaming2Hbase.flumeStreaming  选定打好的jar包路径 <master>  <jars> <time1> <time2> <flumeInterface>
+  * 各参数及其含义：
+  * <master>  spark集群的链接
+  * <jars> 依赖包以及本jar包路径，以逗号分割
+  * <time1> 指定时间内不重复录入数据
+  * <time2> 指定时间内不增加总人数
+  * <flumeInerface> 提供给flume输入数据的接口，以IP,PORT,IP,PORT...的格式输入
   */
 object flumeStreaming {
   var nodes = Seq(
@@ -31,6 +38,7 @@ object flumeStreaming {
   var sprakMaster = "spark://master:7077"
   var jars = List("/home/uul/sparkstringing2hbase.jar")
   var time = 6
+  var leaveWeight = 1000*60*5
   def main(args: Array[String]): Unit = {
     init(args)
     val sc = new SparkConf().setAppName("get flume msg ").setMaster(sprakMaster).setJars(jars)
@@ -42,6 +50,9 @@ object flumeStreaming {
   }
 
 
+  /**
+    * 数据分割以及处理分析，测试数据通过，实际环境需自行修改
+    * */
   def getFlumeMsg2SparkStream(ssc:StreamingContext,address:InetSocketAddress): Unit = {
     val flumeStream = FlumeUtils.createStream(ssc,address.getHostString,address.getPort,StorageLevel.MEMORY_AND_DISK_SER)
     flumeStream.map( e => new String(e.event.getBody.array)).map(_.split("\n").map(x => x.split(" "))).
@@ -60,8 +71,13 @@ object flumeStreaming {
                 var numLong = 1L
                 val result = hTbale.getScanner(new Scan(kv._1.substring(0,kv._1.length-1).getBytes,new PageFilter(1)))
                 val rs = result.next
-                if (rs != null && rs.containsColumn("cf".getBytes,"num".getBytes))
-                  numLong = new String(rs.getValue("cf".getBytes,"num".getBytes)).toLong + 1
+                if (rs != null && rs.containsColumn("cf".getBytes,"num".getBytes) && rs.containsColumn("cf".getBytes(),"helo".getBytes())) {
+                  val oldDate = new String(rs.getValue("cf".getBytes(),"helo".getBytes())).toLong
+                  if (kv._2.toLong - oldDate > leaveWeight)
+                    numLong = new String(rs.getValue("cf".getBytes,"num".getBytes)).toLong + 1
+                  else
+                    numLong = new String(rs.getValue("cf".getBytes,"num".getBytes)).toLong
+                }
                 result.close
                 val put = new Put(kv._1.getBytes)
                 put.add("cf".getBytes,"num".getBytes,numLong.toString.getBytes)
@@ -77,29 +93,37 @@ object flumeStreaming {
 
   def init(args:Array[String]): Unit = {
     if (args.length == 0) return
-    if (args.length != 4) {
-      System.err.println("Usage: getFlumeMsg2SparkStream <Master> <jarFile> <time> <socket*>")
+    if (args.length != 5) {
+      System.err.println("Usage: getFlumeMsg2SparkStream <Master> <jarFile> <time1> <time2> <flumeInerface>")
       System.exit(1)
     }
     sprakMaster = args(0)
-    jars = List(args(1))
+    jars = args(1).split(",").toList
     scala.util.Try(args(2).toInt) match {
       case Success(_) =>
       case _ =>  {
-        System.err.println("Parameter err : <time> is Int")
+        System.err.println("Parameter err : <time1> is Int")
+        System.exit(1)
+      }
+    }
+    scala.util.Try(args(3).toInt) match {
+      case Success(_) =>
+      case _ =>  {
+        System.err.println("Parameter err : <time2> is Int")
         System.exit(1)
       }
     }
     time = args(2).toInt
-    val strs = args(3).split(",")
+    leaveWeight = args(3).toInt
+    val strs = args(4).split(",")
     if (strs.length%2 == 1) {
-      System.err.println("Parameter err : <socket*> not format , length not format")
+      System.err.println("Parameter err : <flumeInerface> not format , length not format")
       System.exit(1)
     }
     for (x <- 0 to strs.length-1 if (x%2 == 1)) scala.util.Try(strs(x).toInt) match {
       case Success(_) =>
       case _ =>  {
-        System.err.println("Parameter err : <socket*> not format , port not format")
+        System.err.println("Parameter err : <flumeInerface> not format , port not format")
         System.exit(1)
       }
     }
