@@ -43,7 +43,7 @@ object flumeStreaming {
     init(args)
     val sc = new SparkConf().setAppName("get flume msg ").setMaster(sprakMaster).setJars(jars)
       .set("spark.executor.memory","10g")
-    val ssc = new StreamingContext(sc,Seconds(10))
+    val ssc = new StreamingContext(sc,Seconds(time))
     for (address <- nodes) getFlumeMsg2SparkStream(ssc,address)
     ssc.start
     ssc.awaitTermination
